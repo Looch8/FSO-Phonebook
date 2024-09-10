@@ -28,6 +28,7 @@ app.get("/", (request, response) => {
 	response.send("<h1>Phonebook</h1>");
 });
 
+//  Display info
 app.get("/info", (request, response) => {
 	const date = new Date();
 	response.send(
@@ -35,8 +36,21 @@ app.get("/info", (request, response) => {
 	);
 });
 
+// Display all entries
 app.get("/api/persons", (request, response) => {
 	response.json(entries);
+});
+
+// Display a single entry
+app.get("/api/persons/:id", (request, response) => {
+	const id = request.params.id;
+	const entry = entries.find((entry) => entry.id === id);
+
+	if (entry) {
+		response.json(entry);
+	} else {
+		response.status(404).end();
+	}
 });
 
 const PORT = 3001;
