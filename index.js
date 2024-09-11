@@ -64,14 +64,39 @@ app.delete("/api/persons/:id", (request, response) => {
 });
 
 // Add an entry
+// Add an entry
 app.post("/api/persons", (request, response) => {
 	const maxId = Math.floor(Math.random() * 100);
 
-	const entry = request.body;
-	entry.id = String(maxId);
-	entries = entries.concat(entry);
+	const body = request.body;
 
-	response.json(entry);
+	// Check if name or number is missing
+	if (!body.name) {
+		return response.status(400).json({
+			error: "name must be unique",
+		});
+	}
+
+	// Check if the name already exists
+	const existingEntry = entries.find((entry) => entry.name === body.name);
+	if (existingEntry) {
+		return response.status(400).json({
+			error: `${body.name} already exists`,
+		});
+	}
+
+	// Create new entry
+	const newEntry = {
+		id: String(maxId),
+		name: body.name,
+		number: body.number,
+	};
+
+	// Add new entry to the list
+	entries = entries.concat(newEntry);
+
+	// Return the new entry
+	response.json(newEntry);
 });
 
 const PORT = 3001;
