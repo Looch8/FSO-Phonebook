@@ -1,6 +1,8 @@
 const express = require("express");
 const app = express();
 
+app.use(express.json());
+
 let entries = [
 	{
 		id: "1",
@@ -59,6 +61,17 @@ app.delete("/api/persons/:id", (request, response) => {
 	entries = entries.filter((entry) => entry.id !== id);
 
 	response.status(204).end();
+});
+
+// Add an entry
+app.post("/api/persons", (request, response) => {
+	const maxId = Math.floor(Math.random() * 100);
+
+	const entry = request.body;
+	entry.id = String(maxId);
+	entries = entries.concat(entry);
+
+	response.json(entry);
 });
 
 const PORT = 3001;
