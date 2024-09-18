@@ -1,109 +1,122 @@
 const express = require("express");
 const morgan = require("morgan");
-const app = express();
 const cors = require("cors");
+const mongoose = require("mongoose");
+require("dotenv").config();
 
-let entries = [
-	{
-		id: "1",
-		name: "Arto Hellas",
-		number: "040-123456",
-	},
-	{
-		id: "2",
-		name: "Ada Lovelace",
-		number: "39-44-5323523",
-	},
-	{
-		id: "3",
-		name: "Dan Abramov",
-		number: "12-43-234345",
-	},
-	{
-		id: "4",
-		name: "Mary Poppendieck",
-		number: "39-23-6423122",
-	},
-];
+const app = express();
 
+// MongoDB connection
+mongoose.set("strictQuery", false);
+
+const url = process.env.MONGODB_URI;
+console.log("connecting to", url);
+mongoose
+	.connect(url)
+	.then(() => {
+		console.log("connected to MongoDB");
+	})
+	.catch((error) => {
+		console.log("error connecting to MongoDB:", error.message);
+	});
+
+// Mongoose schema and model
+const entrySchema = new mongoose.Schema({
+	name: String,
+	number: String,
+});
+
+entrySchema.set("toJSON", {
+	transform: (document, returnedObject) => {
+		returnedObject.id = returnedObject._id.toString();
+		delete returnedObject._id;
+		delete returnedObject.__v;
+	},
+});
+
+const Entry = mongoose.model("Entry", entrySchema);
+
+// Middleware
 app.use(express.json());
 app.use(morgan("tiny"));
 app.use(cors());
 app.use(express.static("dist"));
 
-app.get("/", (request, response) => {
-	response.send("<h1>Phonebook</h1>");
-});
-
-//  Display info
-app.get("/info", (request, response) => {
-	const date = new Date();
-	response.send(
-		`<p>Phonebook has info for ${entries.length} people. <p>${date}</p></p>`
-	);
-});
+// Routes
 
 // Display all entries
 app.get("/api/persons", (request, response) => {
-	response.json(entries);
+	Entry.find({}).then((entries) => {
+		response.json(entries);
+	});
 });
 
 // Display a single entry
-app.get("/api/persons/:id", (request, response) => {
-	const id = request.params.id;
-	const entry = entries.find((entry) => entry.id === id);
-
-	if (entry) {
-		response.json(entry);
-	} else {
-		response.status(404).end();
-	}
+app.get("/api/persons/:id", (request, response, next) => {
+	Entry.findById(request.params.id)
+		.then((entry) => {
+			if (entry) {
+				response.json(entry);
+			} else {
+				response.status(404).end();
+			}
+		})
+		.catch((error) => next(error));
 });
 
 // Delete an entry
-app.delete("/api/persons/:id", (request, response) => {
-	const id = request.params.id;
-	entries = entries.filter((entry) => entry.id !== id);
-
-	response.status(204).end();
+app.delete("/api/persons/:id", (request, response, next) => {
+	Entry.findByIdAndRemove(request.params.id)
+		.then(() => {
+			response.status(204).end();
+		})
+		.catch((error) => next(error));
 });
 
-// Add an entry
-// Add an entry
+// Add a new entry
 app.post("/api/persons", (request, response) => {
-	const maxId = Math.floor(Math.random() * 100);
-
 	const body = request.body;
 
-	// Check if name or number is missing
-	if (!body.name) {
+	// Validate request
+	if (!body.name || !body.number) {
 		return response.status(400).json({
-			error: "name must be unique",
+			error: "name or number is missing",
 		});
 	}
 
 	// Check if the name already exists
-	const existingEntry = entries.find((entry) => entry.name === body.name);
-	if (existingEntry) {
-		return response.status(400).json({
-			error: `${body.name} already exists`,
-		});
-	}
+	Entry.findOne({ name: body.name })
+		.then((existingEntry) => {
+			if (existingEntry) {
+				return response.status(400).json({
+					error: `${body.name} already exists`,
+				});
+			}
 
-	// Create new entry
-	const newEntry = {
-		id: String(maxId),
-		name: body.name,
-		number: body.number,
-	};
+			// Create a new entry
+			const entry = new Entry({
+				name: body.name,
+				number: body.number,
+			});
 
-	// Add new entry to the list
-	entries = entries.concat(newEntry);
-
-	// Return the new entry
-	response.json(newEntry);
+			// Save to MongoDB
+			entry.save().then((savedEntry) => {
+				response.json(savedEntry);
+			});
+		})
+		.catch((error) =>
+			response.status(500).json({ error: "Database error" })
+		);
 });
 
+// Handle unknown endpoints
+const unknownEndpoint = (request, response) => {
+	response.status(404).send({ error: "unknown endpoint" });
+};
+app.use(unknownEndpoint);
+
+// Start server
 const PORT = process.env.PORT || 3001;
-app.listen(PORT);
-console.log(`Server running on port ${PORT}`);
+app.listen(PORT, () => {
+	console.log(`Server running on port ${PORT}`);
+});

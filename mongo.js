@@ -31,3 +31,14 @@ entry.save().then((result) => {
 	console.log(`added ${name} number ${number} to phonebook`);
 	mongoose.connection.close();
 });
+
+Entry.find({}).then((result) => {
+	console.log("phonebook:");
+	result.forEach((entry) => {
+		console.log(entry.name, entry.number);
+	});
+	mongoose.connection.close();
+});
+
+// Q: Change the backend so that new numbers are saved to the database?
+// Q: Which file should this change be made in? Out of mongo.js, index.js, or entry.js?\
